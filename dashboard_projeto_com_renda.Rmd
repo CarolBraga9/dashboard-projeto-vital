@@ -1,0 +1,408 @@
+---
+title: "Dashboard do Projeto"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: yeti
+    iconLib: font-awesome
+    encoding: UTF-8
+runtime: shiny # <-- Adicionado para interatividade e atualização
+---
+
+<style>
+/* --- ESTILO PARA LAYOUT MAIS LARGO --- */
+.container-fluid {
+    max-width: 98% !important;
+}
+
+/* --- ESTILOS VISUAIS PARA OS VALUE BOXES --- */
+.value-box {
+  border-radius: 8px !important; /* Bordas mais arredondadas */
+  box-shadow: 0 4px 8px rgba(0,0,0,0.08); /* Sombra suave para efeito de profundidade */
+  transition: all 0.3s ease-in-out; /* Transição suave para o hover */
+  border: 1px solid rgba(0,0,0,0.05); /* Borda sutil */
+}
+
+.value-box:hover {
+  transform: translateY(-5px); /* Efeito de elevação ao passar o mouse */
+  box-shadow: 0 8px 16px rgba(0,0,0,0.12); /* Sombra mais pronunciada no hover */
+}
+
+/* --- PALETA DE CORES PASTEL PARA OS VALUE BOXES --- */
+.bg-primary { background-color: #E3F2FD !important; } /* Azul bem claro */
+.bg-success { background-color: #E8F5E9 !important; } /* Verde bem claro */
+.bg-info   { background-color: #E0F7FA !important; } /* Ciano bem claro */
+.bg-warning { background-color: #FFFDE7 !important; } /* Amarelo bem claro */
+
+/* --- AJUSTE NA COR DO TEXTO E ÍCONE --- */
+.value-box .value, .value-box .caption {
+  color: #333; /* Preto suave para melhor leitura */
+}
+.value-box .icon {
+  color: rgba(0,0,0,0.20); /* Ícone com cor sutil */
+}
+
+
+/* --- ESTILOS PARA O LOGO --- */
+.logo-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50px; /* Altura padrão da barra de navegação do flexdashboard */
+  z-index: 1050; 
+  pointer-events: none; 
+}
+
+.logo-left {
+  position: absolute;
+  top: 5px; 
+  left: 15px; 
+  height: 40px; 
+  width: auto;
+  pointer-events: auto; 
+}
+
+/* --- AJUSTE PARA O TÍTULO --- */
+.navbar-brand {
+  margin-left: 150px !important; 
+}
+
+/* --- ESTILOS PARA O CRONOGRAMA (GANTT) --- */
+/* Mantendo cores vibrantes para o Gantt, pois o texto é branco */
+.timevis-item.completed {
+    background-color: #198754; 
+    border-color: #157347;
+    color: white;
+}
+.timevis-item.not-started {
+    background-color: #F57C00; 
+    border-color: #e06f00;
+    color: white;
+}
+
+</style>
+
+<!-- --- HTML PARA INSERIR O LOGO --- -->
+<div class="logo-container">
+  <a href="#"><img src="https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png" alt="Logo" class="logo-left"></a>
+</div>
+
+
+```{r setup, include=FALSE}
+# --- CARREGAMENTO DAS BIBLIOTECAS ---
+# Certifique-se de que todas as bibliotecas estão instaladas
+# install.packages(c("flexdashboard", "dplyr", "leaflet", "sf", "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT", "googlesheets4", "shiny"))
+
+library(flexdashboard)
+library(dplyr)
+library(leaflet)
+library(sf)
+library(geobr)
+library(htmlwidgets)
+library(viridis)
+library(timevis)
+library(lubridate)
+library(DT)
+library(googlesheets4) # <-- BIBLIOTECA PARA LER OS DADOS DO GOOGLE
+
+Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
+
+# --- AUTENTICAÇÃO NO GOOGLE ---
+# Para que o shinyapps.io possa ler os dados, as planilhas precisam estar
+# configuradas como "Qualquer pessoa com o link pode ver".
+# Esta linha desativa a necessidade de login no servidor.
+gs4_deauth()
+
+# --- URLs DAS SUAS PLANILHAS ---
+url_profissionais <- "[https://docs.google.com/spreadsheets/d/1naj_-i3O78UPQsTjz65LMkE6r99QoKpZMTokzxFpzAc/edit](https://docs.google.com/spreadsheets/d/1naj_-i3O78UPQsTjz65LMkE6r99QoKpZMTokzxFpzAc/edit)"
+url_atendimentos <- "[https://docs.google.com/spreadsheets/d/1lxeTOtTR2pDRHUqGGELyKl5HCwaJ_M9ALgpCW-GlgSs/edit](https://docs.google.com/spreadsheets/d/1lxeTOtTR2pDRHUqGGELyKl5HCwaJ_M9ALgpCW-GlgSs/edit)"
+url_cep <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit)"
+
+# --- LEITURA DOS DADOS DIRETAMENTE DO GOOGLE SHEETS ---
+# O código tentará ler os dados. Se falhar, mostrará uma mensagem de erro.
+tryCatch({
+  profissionais <- read_sheet(url_profissionais)
+  atendimentos <- read_sheet(url_atendimentos)
+  geo <- read_sheet(url_cep)
+}, error = function(e) {
+  stop("Falha ao ler os dados do Google Sheets. Verifique se as URLs estão corretas e se as permissões estão como 'Qualquer pessoa com o link pode ver'. Erro original: ", e$message)
+})
+
+
+# --- DADOS PARA O CRONOGRAMA (mantido como antes) ---
+gantt_data_new <- data.frame(
+  stringsAsFactors = FALSE,
+  id = 1:6,
+  description = c(
+    "M0 Completar condições prévias",
+    "M1 Profissionais treinados para usar o equipamento",
+    "M2 Agreement entre iCTG e padrão ouro",
+    "M3 Acurácia da IA",
+    "M4 Assessment qualitativo",
+    "M5 Acordo de cooperação técnica entre município P&V e HCFMUSP"
+  ),
+  ref = c("\u2713", "0/50", "80%", "70%", "0/2", "0/1"),
+  start = as.Date(c("2025-01-01", "2025-05-26", "2025-12-26", "2026-06-27", "2026-12-27", "2027-06-28")),
+  end = as.Date(c("2025-05-25", "2025-12-25", "2026-06-26", "2026-12-26", "2027-06-27", "2027-12-27")),
+  status = c(100, 0, 0, 0, 0, 0)
+)
+gantt_data_vis <- gantt_data_new %>%
+  mutate(
+    content = paste(description, "| Ref:", ref),
+    className = ifelse(status == 100, "completed", "not-started")
+  ) %>%
+  select(id, content, start, end, className)
+
+
+# --- PROCESSAMENTO DOS DADOS GEOGRÁFICOS (mantido como antes) ---
+crs_sirgas2000 <- 4674
+geo <- geo %>% filter(!grepl("S", POSTCODE))
+geo$geolocation_zip_code_prefix <- as.numeric(substr(geo$POSTCODE, 1, 5))
+geo_sf <- st_as_sf(geo, coords = c("LON", "LAT"), crs = 4326)
+sp_city <- read_municipality(code_muni = 3550308, year = 2020)
+
+if (is.null(sp_city)) {
+  message("Primeira tentativa de download do mapa falhou. Tentando novamente...")
+  sp_city <- read_municipality(code_muni = 3550308, year = 2020)
+  if(is.null(sp_city)){
+    stop("ERRO CRÍTICO: Não foi possível baixar os dados do município de São Paulo.")
+  }
+}
+
+sp_city <- st_transform(sp_city, crs = crs_sirgas2000)
+geo_sf <- st_transform(geo_sf, crs = crs_sirgas2000)
+sp_only <- geo_sf[st_within(geo_sf, sp_city, sparse = FALSE), ]
+
+# --- CALCULOS DE INDICADORES (mantido como antes) ---
+num_treinados <- profissionais %>% filter(treinamento_realizado == "Sim") %>% nrow()
+nota_media <- profissionais %>% filter(!is.na(nota_avaliacao)) %>% summarise(media = mean(nota_avaliacao, na.rm=TRUE)) %>% pull(media)
+aprova_percent <- profissionais %>% filter(!is.na(aprova_tecnologia)) %>% summarise(aprovam = mean(aprova_tecnologia == "Sim", na.rm=TRUE)*100) %>% pull(aprovam)
+total_atendidos <- n_distinct(atendimentos$id_pessoa)
+total_atendimentos <- nrow(atendimentos)
+```
+
+Página Inicial
+=====================================
+
+### Bem-vindo ao Dashboard de Resultados do Projeto VITAL 
+
+Este dashboard apresenta o acompanhamento dos indicadores do projeto, organizados de acordo com a matriz de resultados. Navegue pelas secções para explorar:
+
+- **Cronograma do Projeto:** Acompanhe o andamento das principais entregas.
+- **Outcomes:** Veja os resultados finais e o impacto esperado do projeto.
+- **Outputs:** Explore os indicadores de produto divididos por componente.
+- **Tracking Indicators:** Monitore indicadores de acompanhamento contínuo.
+
+Row 
+-------------------------------------
+
+### Resumo das Entregas do Projeto
+
+```{r project-summary-table}
+display_table_data <- gantt_data_new %>%
+  mutate(
+    Status = paste0(status, "%"),
+    Até = format(end, "%d/%m/%y")
+  ) %>%
+  select(
+    Status,
+    Ref = ref,
+    Até,
+    `Descrição da Tarefa` = description
+  )
+
+datatable(
+  display_table_data,
+  options = list(dom = 't', paging = FALSE, ordering = FALSE),
+  rownames = FALSE,
+  class = 'display'
+)
+```
+
+Cronograma do Projeto
+=====================================
+
+## Cronograma do Projeto {height=800}
+
+```{r}
+timevis(gantt_data_vis, options = list(
+  height = "100%", 
+  width = "230%",
+  start = "2024-12-01",
+  end = "2029-02-01",
+  orientation = "top",
+  zoomable = TRUE,
+  stack = TRUE,
+  timeAxis = list(scale = "month", step = 3)
+))
+```
+
+Outcomes
+=====================================
+
+Column {.value-boxes}
+-------------------------------------
+
+### Redução de PTBs Eletivos
+
+```{r}
+valueBox("N/D", "Redução de PTBs por alt. CTG", icon = "fa-chart-line", color = "primary")
+```
+
+### Acordo iCTG vs Padrão Ouro
+
+```{r}
+valueBox("N/D", "Acordo iCTG vs Padrão Ouro", icon = "fa-check-double", color = "primary")
+```
+
+Componente 1 {data-navmenu="Outputs"}
+=====================================
+### Indicadores do Componente 1
+Column {.value-boxes}
+-------------------------------------
+### Taxa de Acurácia da IA
+```{r}
+valueBox("N/D", "Acurácia da IA (validado por OBGYN)", icon = "fa-robot", color = "info")
+```
+
+### Profissionais Treinados
+```{r}
+valueBox(num_treinados, "Profissionais Treinados", icon = "fa-chalkboard-teacher", color = "success")
+```
+
+Componente 2 {data-navmenu="Outputs"}
+=====================================
+### Indicadores do Componente 2
+Column {.value-boxes}
+-------------------------------------
+### Medições iCTG realizadas
+```{r}
+valueBox(total_atendimentos, "Nº de medições iCTG", icon = "fa-stethoscope", color = "info")
+```
+
+### Pacientes de Alto Risco Atendidas
+```{r}
+valueBox(total_atendidos, "Pacientes de Alto Risco Atendidas", icon = "fa-users", color = "info")
+```
+
+### Aval. Qualitativa (Pacientes)
+```{r}
+valueBox("N/D", "Aval. Qualitativa das Pacientes", icon = "fa-comment-dots", color = "warning")
+```
+
+### Aval. Qualitativa (Profissionais)
+```{r}
+valueBox(round(nota_media, 1), "Nota Média (Profissionais)", icon = "fa-star", color = "warning")
+```
+
+Componente 3 {data-navmenu="Outputs"}
+=====================================
+### Indicadores do Componente 3
+Column {.value-boxes}
+-------------------------------------
+### Publicação com Resultados
+```{r}
+valueBox("N/D", "Publicação com Resultados", icon = "fa-book-open", color = "primary")
+```
+
+### Protocolos de Monitoramento
+```{r}
+valueBox("N/D", "Protocolos Estabelecidos", icon = "fa-file-signature", color = "primary")
+```
+
+Tracking Indicators {.tabset}
+=====================================
+
+### Atendimentos por Bairro
+
+```{r map-atendimentos}
+bairro_counts <- atendimentos %>% group_by(bairro) %>% summarise(total = n())
+set.seed(456)
+bairro_coords <- bairro_counts %>% 
+  mutate(
+    lat = -23.55 + runif(n(), -0.15, 0.15), 
+    lon = -46.63 + runif(n(), -0.15, 0.15)
+  )
+
+pal_bairros <- colorBin(
+  palette = "viridis",
+  domain = bairro_counts$total,
+  bins = 5
+)
+
+# Centralizar o mapa em São Paulo
+sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
+sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
+
+leaflet(bairro_coords) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addCircles(
+    lng = ~lon, lat = ~lat, 
+    weight = 1, 
+    radius = ~sqrt(total) * 1200, 
+    color = ~pal_bairros(total),
+    stroke = FALSE,
+    fillOpacity = 0.7,
+    popup = ~paste0("<b>Bairro:</b> ", bairro, "<br><b>Atendimentos:</b> ", total)
+  ) %>%
+  addLegend(
+    position = "bottomright", 
+    pal = pal_bairros, 
+    values = ~total,
+    title = "Nº de Atendimentos",
+    opacity = 1
+  ) %>%
+  addMarkers( # Adicionando o pin do Hospital
+    lng = -46.669943, 
+    lat = -23.556373, 
+    popup = "Hospital das Clínicas", 
+    label = "Hospital das Clínicas"
+  ) %>%
+  setView(lng = sp_center[1], lat = sp_center[2], zoom = 10) # Centralizando o mapa
+```
+
+
+### Renda per Capita
+
+```{r map-renda}
+sp_only_wgs84 <- st_transform(sp_only, crs = 4326)
+income_bins <- c(0, 500, 1000, 1500, 2000, 3000, 5000, 50000) 
+pal <- colorBin("viridis", domain = sp_only_wgs84$renda_per_capita, bins = income_bins, pretty = FALSE)
+sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
+sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
+
+leaflet(sp_only_wgs84) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addCircleMarkers(
+    radius = 3,
+    color = ~pal(renda_per_capita), 
+    stroke = FALSE, 
+    fillOpacity = 0.6,
+    popup = ~paste("CEP:", POSTCODE, "<br>Renda per capita: R$", renda_per_capita)
+  ) %>%
+  addLegend(
+    position = "bottomright", 
+    pal = pal, 
+    values = ~renda_per_capita, 
+    title = "Renda per capita (R$)",
+    labFormat = labelFormat(prefix = "R$ "), 
+    opacity = 1
+  ) %>%
+  addMarkers(
+    lng = -46.669943, 
+    lat = -23.556373, 
+    popup = "Hospital das Clínicas", 
+    label = "Hospital das Clínicas"
+  ) %>%
+  setView(lng = sp_center[1], lat = sp_center[2], zoom = 9)
+
+```
+
+
+
+
+
+
+
