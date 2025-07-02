@@ -1,0 +1,88 @@
+# Nome do Workflow: Renderiza e Publica o Flexdashboard
+name: Render and Deploy Flexdashboard
+
+# Gatilhos: Quando este workflow deve rodar?
+on:
+  # 1. A cada push para a branch 'main'
+  push:
+    branches:
+      - main
+  # 2. Agendamento: Rodar todos os dias às 03:00 da manhã (horário UTC)
+  schedule:
+    - cron: '0 3 * * *'
+  # 3. Manualmente: Permite que você rode o workflow a qualquer momento pela aba "Actions"
+  workflow_dispatch:
+
+# Permissões: Concede permissões para o job poder publicar no GitHub Pages
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Jobs: As tarefas que serão executadas
+jobs:
+  build-and-deploy:
+    # O tipo de máquina virtual para rodar o job
+    runs-on: ubuntu-latest
+    
+    # Passos do job
+    steps:
+      # 1. Checkout do código do seu repositório
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Instalação do R
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.3' # Você pode usar a versão do R que preferir
+
+      # 3. Instalação de dependências do sistema (necessário para o pacote 'sf')
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev libudunits2-dev
+
+      # 4. Instalação dos pacotes R (com cache para acelerar futuras execuções)
+      - name: Install R Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::flexdashboard
+            any::dplyr
+            any::leaflet
+            any::sf
+            any::geobr
+            any::htmlwidgets
+            any::viridis
+            any::timevis
+            any::lubridate
+            any::DT
+            any::googlesheets4
+          
+      # 5. Autenticação no Google Drive/Sheets
+      - name: Authenticate to Google
+        run: |
+          # Cria o arquivo de segredo a partir do segredo do GitHub
+          echo "${{ secrets.GDRIVE_AUTH_KEY }}" > gdrive_secret.json
+        # O env abaixo torna o caminho do arquivo disponível para o R
+        env:
+          GDRIVE_AUTH_KEY: gdrive_secret.json
+
+      # 6. Renderiza o Dashboard (converte .Rmd para .html)
+      - name: Render Flexdashboard
+        run: |
+          # O nome do arquivo de saída deve ser index.html para o GitHub Pages
+          Rscript -e "rmarkdown::render('dashboard_projeto_com_renda.Rmd', output_file = 'index.html')"
+        # Substitua SEU_ARQUIVO.Rmd pelo nome real do seu arquivo Rmd
+
+      # 7. Faz o upload do resultado (o site) para o GitHub Pages
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      # 8. Publica o site no GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
