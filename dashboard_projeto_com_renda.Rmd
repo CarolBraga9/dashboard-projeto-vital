@@ -1,1063 +1,533 @@
 ---
-
 title: "Dashboard do Projeto" # Título inicial estático
-
 output:
-
-  flexdashboard::flex_dashboard:
-
-    orientation: rows
-
-    vertical_layout: fill
-
-    theme: yeti
-
-    iconLib: font-awesome
-
-    encoding: UTF-8
-
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: yeti
+    iconLib: font-awesome
+    encoding: UTF-8
 runtime: shiny
-
 ---
 
+```{r setup, include=FALSE}
+# --- CARREGAMENTO DAS BIBLIOTECAS ---
+# Este chunk foi movido para o topo para garantir que todas as bibliotecas
+# sejam carregadas antes de qualquer outra parte do código ser executada.
+library(flexdashboard)
+library(shiny)
+library(shinyjs)
+library(dplyr)
+library(leaflet)
+library(sf)
+library(geobr)
+library(htmlwidgets)
+library(viridis)
+library(timevis)
+library(lubridate)
+library(DT)
+library(googlesheets4)
 
+# Define o locale para garantir a formatação correta de datas e textos
+Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
+
+# --- AUTENTICAÇÃO NO GOOGLE ---
+gs4_deauth()
+
+# --- URL DA PLANILHA ---
+url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
+
+# --- LEITURA DOS DADOS ---
+tryCatch({
+  profissionais <- read_sheet(url_planilha, sheet = "treinamento")
+  atendimentos <- read_sheet(url_planilha, sheet = "atendimentos")
+  geo <- read_sheet(url_planilha, sheet = "geo")
+  translations_df <- read_sheet(url_planilha, sheet = "traducao")
+}, error = function(e) {
+  stop("Falha ao ler os dados do Google Sheets. Verifique a URL, os nomes das abas ('geo', 'treinamento', 'atendimentos', 'traducao') e as permissões. Erro: ", e$message)
+})
+
+# --- PROCESSAMENTO DOS DADOS GEOGRÁFICOS ---
+crs_sirgas2000 <- 4674
+geo <- geo %>% filter(!grepl("S", POSTCODE))
+geo$geolocation_zip_code_prefix <- as.numeric(substr(geo$POSTCODE, 1, 5))
+geo_sf <- st_as_sf(geo, coords = c("LON", "LAT"), crs = 4326)
+sp_city <- read_municipality(code_muni = 3550308, year = 2020)
+sp_city <- st_transform(sp_city, crs = crs_sirgas2000)
+geo_sf <- st_transform(geo_sf, crs = crs_sirgas2000)
+sp_only <- geo_sf[st_within(geo_sf, sp_city, sparse = FALSE), ]
+
+# --- CÁLCULO DOS INDICADORES ---
+num_treinados <- profissionais %>% filter(treinamento_realizado == "Sim") %>% nrow()
+nota_media <- profissionais %>% filter(!is.na(nota_avaliacao)) %>% summarise(media = mean(nota_avaliacao, na.rm=TRUE)) %>% pull(media)
+total_atendidos <- n_distinct(atendimentos$id_pessoa)
+total_atendimentos <- nrow(atendimentos)
+
+# --- SISTEMA DE TRADUÇÃO (i18n) REATIVO ---
+useShinyjs() # Inicializa o shinyjs
+
+current_lang <- reactiveVal("pt")
+observeEvent(input$lang_pt, { current_lang("pt") })
+observeEvent(input$lang_en, { current_lang("en") })
+
+translations_list <- reactive({
+  req(translations_df)
+  list(
+    pt = setNames(as.list(translations_df$pt), translations_df$key),
+    en = setNames(as.list(translations_df$en), translations_df$key)
+  )
+})
+
+tr <- function(key) {
+  lang <- current_lang()
+  translations <- translations_list()
+  translation <- translations[[lang]][[key]]
+  if (is.null(translation)) {
+    return(paste("Missing key:", key))
+  }
+  translation
+}
+
+observe({
+  title <- tr("dashboard_title")
+  session$sendCustomMessage(type = 'setDocumentTitle', message = list(title = title))
+})
+
+# --- RENDERIZAÇÃO DINÂMICA DOS BOTÕES DE IDIOMA ---
+output$lang_buttons_ui <- renderUI({
+  if (current_lang() == "pt") {
+    pt_class <- "btn btn-primary"
+    en_class <- "btn btn-default"
+  } else {
+    pt_class <- "btn btn-default"
+    en_class <- "btn btn-primary"
+  }
+  
+  div(class = "lang-buttons",
+      actionButton(inputId = "lang_pt", label = "PT", class = pt_class),
+      actionButton(inputId = "lang_en", label = "EN", class = en_class)
+  )
+})
+```
 
 <style>
-
 /* --- ESTILO PARA LAYOUT MAIS LARGO --- */
-
 .container-fluid {
-
-    max-width: 98% !important;
-
+    max-width: 98% !important;
 }
-
-
 
 /* --- ESTILOS VISUAIS PARA OS VALUE BOXES --- */
-
 .value-box {
-
-  border-radius: 8px !important;
-
-  box-shadow: 0 4px 8px rgba(0,0,0,0.08);
-
-  transition: all 0.3s ease-in-out;
-
-  border: 1px solid rgba(0,0,0,0.05);
-
+  border-radius: 8px !important;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+  transition: all 0.3s ease-in-out;
+  border: 1px solid rgba(0,0,0,0.05);
 }
-
-
 
 .value-box:hover {
-
-  transform: translateY(-5px);
-
-  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
-
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
 }
-
-
 
 /* --- PALETA DE CORES PASTEL PARA OS VALUE BOXES --- */
-
 .bg-primary { background-color: #E3F2FD !important; }
-
 .bg-success { background-color: #E8F5E9 !important; }
-
-.bg-info   { background-color: #E0F7FA !important; }
-
+.bg-info   { background-color: #E0F7FA !important; }
 .bg-warning { background-color: #FFFDE7 !important; }
 
-
-
 /* --- AJUSTE NA COR DO TEXTO E ÍCONE --- */
-
 .value-box .value, .value-box .caption {
-
-  color: #333;
-
+  color: #333;
 }
-
 .value-box .icon {
-
-  color: rgba(0,0,0,0.35) !important; /* Ícone mais visível */
-
+  color: rgba(0,0,0,0.35) !important; /* Ícone mais visível */
 }
-
-
-
 
 
 /* --- ESTILOS PARA O LOGO E TÍTULO --- */
-
 .logo-container {
-
-  position: fixed;
-
-  top: 0;
-
-  left: 0;
-
-  width: 100%;
-
-  height: 50px;
-
-  z-index: 1050;
-
-  pointer-events: none;
-
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  z-index: 1050;
+  pointer-events: none;
 }
-
-
 
 .logo-left {
-
-  position: absolute;
-
-  top: 5px;
-
-  left: 15px;
-
-  height: 40px;
-
-  width: auto;
-
-  pointer-events: auto;
-
+  position: absolute;
+  top: 5px;
+  left: 15px;
+  height: 40px;
+  width: auto;
+  pointer-events: auto;
 }
-
-
 
 /* Ajusta a margem para não sobrepor o logo */
-
 .navbar-brand {
-
-  margin-left: 170px !important;
-
+  margin-left: 170px !important;
 }
-
-
 
 /* --- ESTILOS PARA O CRONOGRAMA (GANTT) --- */
-
 .timevis-item.completed {
-
-    background-color: #198754;
-
-    border-color: #157347;
-
-    color: white;
-
+    background-color: #198754;
+    border-color: #157347;
+    color: white;
 }
-
 .timevis-item.not-started {
-
-    background-color: #F57C00;
-
-    border-color: #e06f00;
-
-    color: white;
-
+    background-color: #F57C00;
+    border-color: #e06f00;
+    color: white;
 }
-
-
 
 /* --- ESTILOS PARA BOTÕES DE IDIOMA --- */
-
 /* O posicionamento é aplicado ao contêiner gerado pelo renderUI */
-
 .lang-buttons {
-
-  position: fixed;
-
-  top: 10px;
-
-  right: 20px;
-
-  z-index: 1051;
-
+  position: fixed;
+  top: 10px;
+  right: 20px;
+  z-index: 1051;
 }
-
 .lang-buttons .btn {
-
-  padding: 4px 8px;
-
-  font-size: 12px;
-
+  padding: 4px 8px;
+  font-size: 12px;
 }
-
 </style>
 
-
-
 <!-- --- HTML PARA INSERIR O LOGO --- -->
-
 <div class="logo-container">
-
-  <a href="#"><img src="https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png" alt="Logo" class="logo-left"></a>
-
+  <a href="#"><img src="https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png" alt="Logo" class="logo-left"></a>
 </div>
 
-
-
 <!--
-
-  CORREÇÃO: O HTML estático dos botões foi removido.
-
-  Agora, usamos um uiOutput para renderizar os botões dinamicamente a partir do servidor.
-
+  Usamos um uiOutput para renderizar os botões dinamicamente a partir do servidor.
 -->
-
 ```{r, echo=FALSE}
-
 uiOutput("lang_buttons_ui")
-
-```{r setup, include=FALSE}
-
-# --- CARREGAMENTO DAS BIBLIOTECAS ---
-
-library(flexdashboard)
-
-library(shiny)
-
-library(shinyjs)
-
-library(dplyr)
-
-library(leaflet)
-
-library(sf)
-
-library(geobr)
-
-library(htmlwidgets)
-
-library(viridis)
-
-library(timevis)
-
-library(lubridate)
-
-library(DT)
-
-library(googlesheets4)
-
-
-
-# Define o locale para garantir a formatação correta de datas e textos
-
-Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
-
-
-
-# --- AUTENTICAÇÃO NO GOOGLE ---
-
-gs4_deauth()
-
-
-
-# --- URL DA PLANILHA (CORREÇÃO CRÍTICA) ---
-
-# A URL foi corrigida para ser uma string de texto simples, sem formatação Markdown.
-
-url_planilha <- "https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing"
-
-
-
-# --- LEITURA DOS DADOS ---
-
-tryCatch({
-
-  profissionais <- read_sheet(url_planilha, sheet = "treinamento")
-
-  atendimentos <- read_sheet(url_planilha, sheet = "atendimentos")
-
-  geo <- read_sheet(url_planilha, sheet = "geo")
-
-  translations_df <- read_sheet(url_planilha, sheet = "traducao")
-
-}, error = function(e) {
-
-  stop("Falha ao ler os dados do Google Sheets. Verifique a URL, os nomes das abas ('geo', 'treinamento', 'atendimentos', 'traducao') e as permissões. Erro: ", e$message)
-
-})
-
-
-
-# --- PROCESSAMENTO DOS DADOS GEOGRÁFICOS ---
-
-crs_sirgas2000 <- 4674
-
-geo <- geo %>% filter(!grepl("S", POSTCODE))
-
-geo$geolocation_zip_code_prefix <- as.numeric(substr(geo$POSTCODE, 1, 5))
-
-geo_sf <- st_as_sf(geo, coords = c("LON", "LAT"), crs = 4326)
-
-sp_city <- read_municipality(code_muni = 3550308, year = 2020)
-
-sp_city <- st_transform(sp_city, crs = crs_sirgas2000)
-
-geo_sf <- st_transform(geo_sf, crs = crs_sirgas2000)
-
-sp_only <- geo_sf[st_within(geo_sf, sp_city, sparse = FALSE), ]
-
-
-
-# --- CÁLCULO DOS INDICADORES ---
-
-num_treinados <- profissionais %>% filter(treinamento_realizado == "Sim") %>% nrow()
-
-nota_media <- profissionais %>% filter(!is.na(nota_avaliacao)) %>% summarise(media = mean(nota_avaliacao, na.rm=TRUE)) %>% pull(media)
-
-total_atendidos <- n_distinct(atendimentos$id_pessoa)
-
-total_atendimentos <- nrow(atendimentos)
-
-
-
-# --- SISTEMA DE TRADUÇÃO (i18n) REATIVO ---
-
-useShinyjs() # Inicializa o shinyjs
-
-
-
-current_lang <- reactiveVal("pt")
-
-observeEvent(input$lang_pt, { current_lang("pt") })
-
-observeEvent(input$lang_en, { current_lang("en") })
-
-
-
-translations_list <- reactive({
-
-  req(translations_df)
-
-  list(
-
-    pt = setNames(as.list(translations_df$pt), translations_df$key),
-
-    en = setNames(as.list(translations_df$en), translations_df$key)
-
-  )
-
-})
-
-
-
-tr <- function(key) {
-
-  lang <- current_lang()
-
-  translations <- translations_list()
-
-  translation <- translations[[lang]][[key]]
-
-  if (is.null(translation)) {
-
-    return(paste("Missing key:", key))
-
-  }
-
-  translation
-
-}
-
-
-
-observe({
-
-  title <- tr("dashboard_title")
-
-  session$sendCustomMessage(type = 'setDocumentTitle', message = list(title = title))
-
-})
-
-
-
-# --- CORREÇÃO: RENDERIZAÇÃO DINÂMICA DOS BOTÕES DE IDIOMA ---
-
-# Este bloco substitui o antigo 'observe' com 'runjs'.
-
-# É uma abordagem mais robusta e nativa do Shiny.
-
-output$lang_buttons_ui <- renderUI({
-
-  if (current_lang() == "pt") {
-
-    pt_class <- "btn btn-primary"
-
-    en_class <- "btn btn-default"
-
-  } else {
-
-    pt_class <- "btn btn-default"
-
-    en_class <- "btn btn-primary"
-
-  }
-
-  
-
-  div(class = "lang-buttons",
-
-      actionButton(inputId = "lang_pt", label = "PT", class = pt_class),
-
-      actionButton(inputId = "lang_en", label = "EN", class = en_class)
-
-  )
-
-})
-
 ```
 
-
-
 <!-- Handler de JavaScript para atualizar o título da página -->
-
 <script>
-
 Shiny.addCustomMessageHandler('setDocumentTitle', function(message) {
-
-  document.title = message.title;
-
-  $('.navbar-brand').text(message.title);
-
+  document.title = message.title;
+  $('.navbar-brand').text(message.title);
 });
-
 </script>
 
 
-
-
-
 Página Inicial
-
 =====================================
-
-
 
 ### `r textOutput("welcome_title", inline = TRUE)`
 
-
-
 `r textOutput("welcome_intro", inline = TRUE)`
-
 - **`r textOutput("nav_gantt", inline = TRUE)`**: Navegue pelo cronograma do projeto.
-
 - **`r textOutput("nav_outcomes", inline = TRUE)`**: Veja os resultados e o impacto.
-
 - **`r textOutput("nav_outputs", inline = TRUE)`**: Explore os produtos e entregas.
-
 - **`r textOutput("nav_tracking", inline = TRUE)`**: Acompanhe os indicadores geográficos.
 
 
-
-
-
 ```{r}
-
 # Renderiza os textos usando as chaves da sua planilha
-
 output$welcome_title <- renderText({ tr("welcome_title") })
-
 output$welcome_intro <- renderText({ tr("welcome_intro") })
-
 output$nav_gantt <- renderText({ tr("section_gantt") })
-
 output$nav_outcomes <- renderText({ tr("section_outcomes") })
-
 output$nav_outputs <- renderText({ tr("nav_outputs") })
-
 output$nav_tracking <- renderText({ tr("section_tracking") })
-
 ```
-
-
-
 
 
 Row
-
 -------------------------------------
-
-
 
 ### `r textOutput("summary_title", inline = TRUE)`
 
-
-
 ```{r project-summary-table}
-
 # Usa a chave correta para o título do resumo
-
 output$summary_title <- renderText({ tr("project_summary_title") })
 
-
-
 output$summary_table <- renderDT({
+  # As descrições das tarefas agora usam as chaves da sua planilha
+  gantt_data_new <- data.frame(
+    stringsAsFactors = FALSE,
+    id = 1:6,
+    description = c(
+      tr("gantt_task_m0"), 
+      tr("gantt_task_m1"), 
+      tr("gantt_task_m2"), 
+      tr("gantt_task_m3"), 
+      tr("gantt_task_m4"), 
+      tr("gantt_task_m5")
+    ),
+    ref = c("✓", "0/50", "80%", "70%", "0/2", "0/1"),
+    start = as.Date(c("2025-01-01", "2025-05-26", "2025-12-26", "2026-06-27", "2026-12-27", "2027-06-28")),
+    end = as.Date(c("2025-05-25", "2025-12-25", "2026-06-26", "2026-12-26", "2027-06-27", "2027-12-27")),
+    status = c(100, 0, 0, 0, 0, 0)
+  )
 
-  # As descrições das tarefas agora usam as chaves da sua planilha
-
-  gantt_data_new <- data.frame(
-
-    stringsAsFactors = FALSE,
-
-    id = 1:6,
-
-    description = c(
-
-      tr("gantt_task_m0"), 
-
-      tr("gantt_task_m1"), 
-
-      tr("gantt_task_m2"), 
-
-      tr("gantt_task_m3"), 
-
-      tr("gantt_task_m4"), 
-
-      tr("gantt_task_m5")
-
-    ),
-
-    ref = c("✓", "0/50", "80%", "70%", "0/2", "0/1"),
-
-    start = as.Date(c("2025-01-01", "2025-05-26", "2025-12-26", "2026-06-27", "2026-12-27", "2027-06-28")),
-
-    end = as.Date(c("2025-05-25", "2025-12-25", "2026-06-26", "2026-12-26", "2027-06-27", "2027-12-27")),
-
-    status = c(100, 0, 0, 0, 0, 0)
-
-  )
-
-
-
-  display_table_data <- gantt_data_new %>%
-
-    mutate(
-
-      Status_col = paste0(status, "%"),
-
-      Até_col = format(end, "%d/%m/%y")
-
-    ) %>%
-
-    select(Status_col, Ref_col = ref, Até_col, Descrição_col = description)
-
-  
-
-  # Renomeia as colunas usando as chaves de tradução
-
-  colnames(display_table_data) <- c(
-
-    tr("datatable_status"), 
-
-    tr("datatable_ref"), 
-
-    tr("datatable_due"), 
-
-    tr("datatable_desc")
-
-  )
-
-  
-
-  datatable(
-
-    display_table_data,
-
-    options = list(dom = 't', paging = FALSE, ordering = FALSE),
-
-    rownames = FALSE,
-
-    class = 'display'
-
-  )
-
+  display_table_data <- gantt_data_new %>%
+    mutate(
+      Status_col = paste0(status, "%"),
+      Até_col = format(end, "%d/%m/%y")
+    ) %>%
+    select(Status_col, Ref_col = ref, Até_col, Descrição_col = description)
+  
+  # Renomeia as colunas usando as chaves de tradução
+  colnames(display_table_data) <- c(
+    tr("datatable_status"), 
+    tr("datatable_ref"), 
+    tr("datatable_due"), 
+    tr("datatable_desc")
+  )
+  
+  datatable(
+    display_table_data,
+    options = list(dom = 't', paging = FALSE, ordering = FALSE),
+    rownames = FALSE,
+    class = 'display'
+  )
 })
 
-
-
 DTOutput("summary_table")
-
 ```
 
-
-
 Cronograma do Projeto
-
 =====================================
-
-
 
 ### `r textOutput("gantt_title", inline=TRUE)`
 
-
-
 ```{r gantt-chart-section}
-
 output$gantt_title <- renderText({ tr("section_gantt") })
 
-
-
 output$gantt_chart <- renderTimevis({
-
-  # As descrições das tarefas aqui também foram corrigidas
-
-  gantt_data_new <- data.frame(
-
-    stringsAsFactors = FALSE,
-
-    id = 1:6,
-
-    description = c(
-
-      tr("gantt_task_m0"), 
-
-      tr("gantt_task_m1"), 
-
-      tr("gantt_task_m2"), 
-
-      tr("gantt_task_m3"), 
-
-      tr("gantt_task_m4"), 
-
-      tr("gantt_task_m5")
-
-    ),
-
-    ref = c("✓", "0/50", "80%", "70%", "0/2", "0/1"),
-
-    start = as.Date(c("2025-01-01", "2025-05-26", "2025-12-26", "2026-06-27", "2026-12-27", "2027-06-28")),
-
-    end = as.Date(c("2025-05-25", "2025-12-25", "2026-06-26", "2026-12-26", "2027-06-27", "2027-12-27")),
-
-    status = c(100, 0, 0, 0, 0, 0)
-
-  )
-
-  
-
-  gantt_data_vis <- gantt_data_new %>%
-
-    mutate(
-
-      content = paste(description, "| Ref:", ref),
-
-      className = ifelse(status == 100, "completed", "not-started")
-
-    ) %>%
-
-    select(id, content, start, end, className)
-
-    
-
-  timevis(gantt_data_vis, options = list(
-
-    height = "100%", 
-
-    width = "100%",
-
-    start = "2024-12-01",
-
-    end = "2029-02-01",
-
-    orientation = "top",
-
-    zoomable = TRUE,
-
-    stack = TRUE,
-
-    timeAxis = list(scale = "month", step = 3)
-
-  ))
-
+  # As descrições das tarefas aqui também foram corrigidas
+  gantt_data_new <- data.frame(
+    stringsAsFactors = FALSE,
+    id = 1:6,
+    description = c(
+      tr("gantt_task_m0"), 
+      tr("gantt_task_m1"), 
+      tr("gantt_task_m2"), 
+      tr("gantt_task_m3"), 
+      tr("gantt_task_m4"), 
+      tr("gantt_task_m5")
+    ),
+    ref = c("✓", "0/50", "80%", "70%", "0/2", "0/1"),
+    start = as.Date(c("2025-01-01", "2025-05-26", "2025-12-26", "2026-06-27", "2026-12-27", "2027-06-28")),
+    end = as.Date(c("2025-05-25", "2025-12-25", "2026-06-26", "2026-12-26", "2027-06-27", "2027-12-27")),
+    status = c(100, 0, 0, 0, 0, 0)
+  )
+  
+  gantt_data_vis <- gantt_data_new %>%
+    mutate(
+      content = paste(description, "| Ref:", ref),
+      className = ifelse(status == 100, "completed", "not-started")
+    ) %>%
+    select(id, content, start, end, className)
+    
+  timevis(gantt_data_vis, options = list(
+    height = "100%", 
+    width = "100%",
+    start = "2024-12-01",
+    end = "2029-02-01",
+    orientation = "top",
+    zoomable = TRUE,
+    stack = TRUE,
+    timeAxis = list(scale = "month", step = 3)
+  ))
 })
 
-
-
 timevisOutput("gantt_chart", height = "800px")
-
 ```
 
-
-
 Outcomes
-
 =====================================
 
-
-
 Column {.value-boxes}
-
 -------------------------------------
-
-
 
 ### `r textOutput("outcome1_title", inline = TRUE)`
 
-
-
 ```{r}
-
 output$outcome1_title <- renderText({ tr("outcome1_title") })
-
 output$outcome1_vb <- renderValueBox({
-
-  valueBox("N/D", tr("vb_reduction_ptb_caption"), icon = "fa-chart-line", color = "primary")
-
+  valueBox("N/D", tr("vb_reduction_ptb_caption"), icon = "fa-chart-line", color = "primary")
 })
-
 valueBoxOutput("outcome1_vb")
-
 ```
-
-
 
 ### `r textOutput("outcome2_title", inline = TRUE)`
 
-
-
 ```{r}
-
 output$outcome2_title <- renderText({ tr("outcome2_title") })
-
 output$outcome2_vb <- renderValueBox({
-
-  valueBox("N/D", tr("vb_agreement_caption"), icon = "fa-check-double", color = "primary")
-
+  valueBox("N/D", tr("vb_agreement_caption"), icon = "fa-check-double", color = "primary")
 })
-
 valueBoxOutput("outcome2_vb")
-
 ```
-
-
 
 Componente 1 {data-navmenu="Outputs"}
-
 =====================================
-
 ### `r textOutput("comp1_title", inline = TRUE)`
-
 Column {.value-boxes}
-
 -------------------------------------
-
 ### `r textOutput("comp1_ind1_title", inline = TRUE)`
-
 ```{r}
-
 output$comp1_title <- renderText({ tr("section_outputs_c1") })
-
 output$comp1_ind1_title <- renderText({ tr("c1_ind1_title") })
-
 output$comp1_ind1_vb <- renderValueBox({
-
-  valueBox("N/D", tr("vb_accuracy_caption"), icon = "fa-robot", color = "info")
-
+  valueBox("N/D", tr("vb_accuracy_caption"), icon = "fa-robot", color = "info")
 })
-
 valueBoxOutput("comp1_ind1_vb")
-
 ```
-
-
 
 ### `r textOutput("comp1_ind2_title", inline = TRUE)`
-
 ```{r}
-
 output$comp1_ind2_title <- renderText({ tr("c1_ind2_title") })
-
 output$comp1_ind2_vb <- renderValueBox({
-
-  valueBox(num_treinados, tr("vb_trained_prof_caption"), icon = "fa-chalkboard-teacher", color = "success")
-
+  valueBox(num_treinados, tr("vb_trained_prof_caption"), icon = "fa-chalkboard-teacher", color = "success")
 })
-
 valueBoxOutput("comp1_ind2_vb")
-
 ```
-
-
 
 Componente 2 {data-navmenu="Outputs"}
-
 =====================================
-
 ### `r textOutput("comp2_title", inline = TRUE)`
-
 Column {.value-boxes}
-
 -------------------------------------
-
 ### `r textOutput("comp2_ind1_title", inline = TRUE)`
-
 ```{r}
-
 output$comp2_title <- renderText({ tr("section_outputs_c2") })
-
 output$comp2_ind1_title <- renderText({ tr("c2_ind1_title") })
-
 output$comp2_ind1_vb <- renderValueBox({
-
-  valueBox(total_atendimentos, tr("vb_ictg_measurements_caption"), icon = "fa-stethoscope", color = "info")
-
+  valueBox(total_atendimentos, tr("vb_ictg_measurements_caption"), icon = "fa-stethoscope", color = "info")
 })
-
 valueBoxOutput("comp2_ind1_vb")
-
 ```
-
-
 
 ### `r textOutput("comp2_ind2_title", inline = TRUE)`
-
 ```{r}
-
 output$comp2_ind2_title <- renderText({ tr("c2_ind2_title") })
-
 output$comp2_ind2_vb <- renderValueBox({
-
-  valueBox(total_atendidos, tr("vb_high_risk_patients_caption"), icon = "fa-users", color = "info")
-
+  valueBox(total_atendidos, tr("vb_high_risk_patients_caption"), icon = "fa-users", color = "info")
 })
-
 valueBoxOutput("comp2_ind2_vb")
-
 ```
-
-
 
 ### `r textOutput("comp2_ind3_title", inline = TRUE)`
-
 ```{r}
-
 output$comp2_ind3_title <- renderText({ tr("c2_ind3_title") })
-
 output$comp2_ind3_vb <- renderValueBox({
-
-  valueBox("N/D", tr("vb_qual_patients_caption"), icon = "fa-comment-dots", color = "warning")
-
+  valueBox("N/D", tr("vb_qual_patients_caption"), icon = "fa-comment-dots", color = "warning")
 })
-
 valueBoxOutput("comp2_ind3_vb")
-
 ```
-
-
 
 ### `r textOutput("comp2_ind4_title", inline = TRUE)`
-
 ```{r}
-
 output$comp2_ind4_title <- renderText({ tr("c2_ind4_title") })
-
 output$comp2_ind4_vb <- renderValueBox({
-
-  valueBox(round(nota_media, 1), tr("vb_qual_prof_caption"), icon = "fa-star", color = "warning")
-
+  valueBox(round(nota_media, 1), tr("vb_qual_prof_caption"), icon = "fa-star", color = "warning")
 })
-
 valueBoxOutput("comp2_ind4_vb")
-
 ```
-
-
 
 Componente 3 {data-navmenu="Outputs"}
-
 =====================================
-
 ### `r textOutput("comp3_title", inline = TRUE)`
-
 Column {.value-boxes}
-
 -------------------------------------
-
 ### `r textOutput("comp3_ind1_title", inline = TRUE)`
-
 ```{r}
-
 output$comp3_title <- renderText({ tr("section_outputs_c3") })
-
 output$comp3_ind1_title <- renderText({ tr("c3_ind1_title") })
-
 output$comp3_ind1_vb <- renderValueBox({
-
-  valueBox("N/D", tr("vb_publication_caption"), icon = "fa-book-open", color = "primary")
-
+  valueBox("N/D", tr("vb_publication_caption"), icon = "fa-book-open", color = "primary")
 })
-
 valueBoxOutput("comp3_ind1_vb")
-
 ```
-
-
 
 ### `r textOutput("comp3_ind2_title", inline = TRUE)`
-
 ```{r}
-
 output$comp3_ind2_title <- renderText({ tr("c3_ind2_title") })
-
 output$comp3_ind2_vb <- renderValueBox({
-
-  valueBox("N/D", tr("vb_protocols_caption"), icon = "fa-file-signature", color = "primary")
-
+  valueBox("N/D", tr("vb_protocols_caption"), icon = "fa-file-signature", color = "primary")
 })
-
 valueBoxOutput("comp3_ind2_vb")
-
 ```
 
-
-
 Tracking Indicators {.tabset}
-
 =====================================
-
-
 
 ### `r textOutput("tracking_map1_title", inline = TRUE)`
 
-
-
 ```{r map-atendimentos}
-
 output$tracking_map1_title <- renderText({ tr("section_tracking") })
 
-
-
 output$map_atendimentos <- renderLeaflet({
+  bairro_counts <- atendimentos %>% group_by(bairro) %>% summarise(total = n())
+  set.seed(456)
+  bairro_coords <- bairro_counts %>% 
+    mutate(
+      lat = -23.55 + runif(n(), -0.15, 0.15), 
+      lon = -46.63 + runif(n(), -0.15, 0.15)
+    )
 
-  bairro_counts <- atendimentos %>% group_by(bairro) %>% summarise(total = n())
+  pal_bairros <- colorBin(palette = "viridis", domain = bairro_counts$total, bins = 5)
+  sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
+  sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
 
-  set.seed(456)
-
-  bairro_coords <- bairro_counts %>% 
-
-    mutate(
-
-      lat = -23.55 + runif(n(), -0.15, 0.15), 
-
-      lon = -46.63 + runif(n(), -0.15, 0.15)
-
-    )
-
-
-
-  pal_bairros <- colorBin(palette = "viridis", domain = bairro_counts$total, bins = 5)
-
-  sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
-
-  sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
-
-
-
-  leaflet(bairro_coords) %>%
-
-    addProviderTiles(providers$CartoDB.Positron) %>%
-
-    addCircles(
-
-      lng = ~lon, lat = ~lat, weight = 1, radius = ~sqrt(total) * 1200, 
-
-      color = ~pal_bairros(total), stroke = FALSE, fillOpacity = 0.7,
-
-      popup = ~paste0("<b>", tr("map_neighborhood_popup_label"), ":</b> ", bairro, "<br><b>", tr("map_neighborhood_popup_visits"), ":</b> ", total)
-
-    ) %>%
-
-    addLegend(
-
-      position = "bottomright", pal = pal_bairros, values = ~total,
-
-      title = tr("map_neighborhood_legend_title"), opacity = 1
-
-    ) %>%
-
-    addMarkers(
-
-      lng = -46.669943, lat = -23.556373, 
-
-      popup = tr("map_hospital_label"), label = tr("map_hospital_label")
-
-    ) %>%
-
-    setView(lng = sp_center[1], lat = sp_center[2], zoom = 10)
-
+  leaflet(bairro_coords) %>%
+    addProviderTiles(providers$CartoDB.Positron) %>%
+    addCircles(
+      lng = ~lon, lat = ~lat, weight = 1, radius = ~sqrt(total) * 1200, 
+      color = ~pal_bairros(total), stroke = FALSE, fillOpacity = 0.7,
+      popup = ~paste0("<b>", tr("map_neighborhood_popup_label"), ":</b> ", bairro, "<br><b>", tr("map_neighborhood_popup_visits"), ":</b> ", total)
+    ) %>%
+    addLegend(
+      position = "bottomright", pal = pal_bairros, values = ~total,
+      title = tr("map_neighborhood_legend_title"), opacity = 1
+    ) %>%
+    addMarkers(
+      lng = -46.669943, lat = -23.556373, 
+      popup = tr("map_hospital_label"), label = tr("map_hospital_label")
+    ) %>%
+    setView(lng = sp_center[1], lat = sp_center[2], zoom = 10)
 })
-
 leafletOutput("map_atendimentos")
-
 ```
-
-
-
 
 
 ### `r textOutput("tracking_map2_title", inline = TRUE)`
 
-
-
 ```{r map-renda}
-
 output$tracking_map2_title <- renderText({ tr("map_income_title") })
 
-
-
 output$map_renda <- renderLeaflet({
+  sp_only_wgs84 <- st_transform(sp_only, crs = 4326)
+  income_bins <- c(0, 500, 1000, 1500, 2000, 3000, 5000, 50000) 
+  pal <- colorBin("viridis", domain = sp_only_wgs84$renda_per_capita, bins = income_bins, pretty = FALSE)
+  sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
+  sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
 
-  sp_only_wgs84 <- st_transform(sp_only, crs = 4326)
-
-  income_bins <- c(0, 500, 1000, 1500, 2000, 3000, 5000, 50000) 
-
-  pal <- colorBin("viridis", domain = sp_only_wgs84$renda_per_capita, bins = income_bins, pretty = FALSE)
-
-  sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
-
-  sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
-
-
-
-  leaflet(sp_only_wgs84) %>%
-
-    addProviderTiles(providers$CartoDB.Positron) %>%
-
-    addCircleMarkers(
-
-      radius = 3, color = ~pal(renda_per_capita), stroke = FALSE, fillOpacity = 0.6,
-
-      popup = ~paste("CEP:", POSTCODE, "<br>", tr("map_income_legend_title"), ": R$", renda_per_capita)
-
-    ) %>%
-
-    addLegend(
-
-      position = "bottomright", pal = pal, values = ~renda_per_capita, 
-
-      title = tr("map_income_legend_title"),
-
-      labFormat = labelFormat(prefix = "R$ "), opacity = 1
-
-    ) %>%
-
-    addMarkers(
-
-      lng = -46.669943, lat = -23.556373, 
-
-      popup = tr("map_hospital_label"), label = tr("map_hospital_label")
-
-    ) %>%
-
-    setView(lng = sp_center[1], lat = sp_center[2], zoom = 9)
-
+  leaflet(sp_only_wgs84) %>%
+    addProviderTiles(providers$CartoDB.Positron) %>%
+    addCircleMarkers(
+      radius = 3, color = ~pal(renda_per_capita), stroke = FALSE, fillOpacity = 0.6,
+      popup = ~paste("CEP:", POSTCODE, "<br>", tr("map_income_legend_title"), ": R$", renda_per_capita)
+    ) %>%
+    addLegend(
+      position = "bottomright", pal = pal, values = ~renda_per_capita, 
+      title = tr("map_income_legend_title"),
+      labFormat = labelFormat(prefix = "R$ "), opacity = 1
+    ) %>%
+    addMarkers(
+      lng = -46.669943, lat = -23.556373, 
+      popup = tr("map_hospital_label"), label = tr("map_hospital_label")
+    ) %>%
+    setView(lng = sp_center[1], lat = sp_center[2], zoom = 9)
 })
 
 leafletOutput("map_renda")
