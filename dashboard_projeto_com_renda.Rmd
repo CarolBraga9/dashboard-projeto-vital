@@ -11,9 +11,20 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
+# --- VERIFICAÇÃO E INSTALAÇÃO DE PACOTES ---
+# Este bloco garante que todos os pacotes necessários sejam instalados
+# no ambiente de execução, como o do GitHub Actions.
+pacotes_necessarios <- c(
+  "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf", 
+  "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT", 
+  "googlesheets4"
+)
+pacotes_a_instalar <- pacotes_necessarios[!(pacotes_necessarios %in% installed.packages()[,"Package"])]
+if(length(pacotes_a_instalar) > 0) {
+  install.packages(pacotes_a_instalar, repos = "[http://cran.us.r-project.org](http://cran.us.r-project.org)")
+}
+
 # --- CARREGAMENTO DAS BIBLIOTECAS ---
-# Este chunk foi movido para o topo para garantir que todas as bibliotecas
-# sejam carregadas antes de qualquer outra parte do código ser executada.
 library(flexdashboard)
 library(shiny)
 library(shinyjs)
@@ -34,7 +45,8 @@ Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
 # --- AUTENTICAÇÃO NO GOOGLE ---
 gs4_deauth()
 
-# --- URL DA PLANILHA ---
+# --- URL DA PLANILHA (CORRIGIDA) ---
+# A URL foi corrigida para ser uma string de texto simples, sem formatação Markdown.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
@@ -531,5 +543,4 @@ output$map_renda <- renderLeaflet({
 })
 
 leafletOutput("map_renda")
-
 ```
