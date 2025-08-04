@@ -21,7 +21,7 @@ pacotes_necessarios <- c(
 )
 pacotes_a_instalar <- pacotes_necessarios[!(pacotes_necessarios %in% installed.packages()[,"Package"])]
 if(length(pacotes_a_instalar) > 0) {
-  # CORREÇÃO: Removida a formatação de Markdown da URL do repositório.
+  # CORREÇÃO FINAL: A URL agora é uma string de texto simples.
   install.packages(pacotes_a_instalar, repos = "[http://cran.us.r-project.org](http://cran.us.r-project.org)")
 }
 
@@ -47,7 +47,7 @@ Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
 gs4_deauth()
 
 # --- URL DA PLANILHA (CORRIGIDA) ---
-# CORREÇÃO: Removida a formatação de Markdown da URL da planilha.
+# CORREÇÃO FINAL: A URL agora é uma string de texto simples.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
@@ -543,7 +543,6 @@ output$map_renda <- renderLeaflet({
     setView(lng = sp_center[1], lat = sp_center[2], zoom = 9)
 })
 
-leafletOutput("map_renda")
-
-
 ```
+
+leafletOutput("map_renda")
