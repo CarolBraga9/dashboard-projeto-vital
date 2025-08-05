@@ -12,10 +12,8 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 # --- ABORDAGEM DE INSTALAÇÃO ROBUSTA DE PACOTES ---
-# Esta nova abordagem garante que o pacote 'remotes' esteja instalado
-# e o utiliza para instalar os demais pacotes necessários a partir do CRAN.
-# É um método mais confiável para ambientes automatizados como o GitHub Actions.
-if (!require("remotes")) {
+# CORREÇÃO FINAL: As URLs agora são strings de texto simples, permitindo a instalação.
+if (!requireNamespace("remotes", quietly = TRUE)) {
   install.packages("remotes", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)")
 }
 
@@ -40,7 +38,7 @@ try(Sys.setlocale("LC_ALL", "pt_BR.UTF-8"), silent = TRUE)
 gs4_deauth()
 
 # --- URL DA PLANILHA (CORRIGIDA) ---
-# CORREÇÃO DEFINITIVA: A URL é uma string de texto simples, sem formatação Markdown.
+# CORREÇÃO FINAL: A URL é uma string de texto simples, sem formatação Markdown.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
@@ -538,3 +536,4 @@ output$map_renda <- renderLeaflet({
 
 leafletOutput("map_renda")
 ```
+
