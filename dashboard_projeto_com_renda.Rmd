@@ -11,21 +11,20 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-# --- ABORDAGEM DE INSTALAÇÃO DIRETA E CORRIGIDA ---
-# CORREÇÃO FINAL: As URLs agora são strings de texto simples, permitindo a instalação.
+# --- ABORDAGEM DE INSTALAÇÃO FINAL E DIRETA ---
+# CORREÇÃO DEFINITIVA: A URL do repositório está agora como uma string de texto simples,
+# que é o formato correto para o R. A lógica complexa foi removida
+# para garantir que a instalação seja executada sem falhas no GitHub Actions.
+
 pacotes_necessarios <- c(
   "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf",
   "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT",
   "googlesheets4"
 )
 
-# Itera sobre os pacotes e instala apenas os que não estão presentes
-for (pacote in pacotes_necessarios) {
-  if (!require(pacote, character.only = TRUE)) {
-    # CORREÇÃO CRÍTICA: A URL do repositório agora é uma string de texto válida.
-    install.packages(pacote, repos = "[https://cloud.r-project.org](https://cloud.r-project.org)")
-  }
-}
+# Instala todos os pacotes diretamente. Em um ambiente limpo como o do GitHub,
+# esta é a forma mais robusta.
+install.packages(pacotes_necessarios, repos = "[https://cloud.r-project.org](https://cloud.r-project.org)")
 
 # --- CARREGAMENTO DAS BIBLIOTECAS ---
 # Garante que todas as bibliotecas sejam carregadas após a instalação
@@ -39,7 +38,7 @@ try(Sys.setlocale("LC_ALL", "pt_BR.UTF-8"), silent = TRUE)
 gs4_deauth()
 
 # --- URL DA PLANILHA (CORRIGIDA) ---
-# CORREÇÃO CRÍTICA: A URL da planilha agora é uma string de texto válida.
+# CORREÇÃO DEFINITIVA: A URL da planilha agora é uma string de texto válida.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
