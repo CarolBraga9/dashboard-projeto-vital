@@ -15,13 +15,13 @@ runtime: shiny
 # Este bloco garante que todos os pacotes necessários sejam instalados
 # no ambiente de execução, como o do GitHub Actions.
 pacotes_necessarios <- c(
-  "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf", 
-  "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT", 
+  "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf",
+  "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT",
   "googlesheets4"
 )
 pacotes_a_instalar <- pacotes_necessarios[!(pacotes_necessarios %in% installed.packages()[,"Package"])]
 if(length(pacotes_a_instalar) > 0) {
-  # CORREÇÃO FINAL: A URL agora é uma string de texto simples.
+  # CORREÇÃO: A URL agora é uma string de texto simples e válida.
   install.packages(pacotes_a_instalar, repos = "[http://cran.us.r-project.org](http://cran.us.r-project.org)")
 }
 
@@ -41,13 +41,13 @@ library(DT)
 library(googlesheets4)
 
 # Define o locale para garantir a formatação correta de datas e textos
-Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
+try(Sys.setlocale("LC_ALL", "pt_BR.UTF-8"), silent = TRUE)
 
 # --- AUTENTICAÇÃO NO GOOGLE ---
 gs4_deauth()
 
 # --- URL DA PLANILHA (CORRIGIDA) ---
-# CORREÇÃO FINAL: A URL agora é uma string de texto simples.
+# CORREÇÃO: A URL agora é uma string de texto simples e válida.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
@@ -267,11 +267,11 @@ output$summary_table <- renderDT({
     stringsAsFactors = FALSE,
     id = 1:6,
     description = c(
-      tr("gantt_task_m0"), 
-      tr("gantt_task_m1"), 
-      tr("gantt_task_m2"), 
-      tr("gantt_task_m3"), 
-      tr("gantt_task_m4"), 
+      tr("gantt_task_m0"),
+      tr("gantt_task_m1"),
+      tr("gantt_task_m2"),
+      tr("gantt_task_m3"),
+      tr("gantt_task_m4"),
       tr("gantt_task_m5")
     ),
     ref = c("✓", "0/50", "80%", "70%", "0/2", "0/1"),
@@ -289,9 +289,9 @@ output$summary_table <- renderDT({
   
   # Renomeia as colunas usando as chaves de tradução
   colnames(display_table_data) <- c(
-    tr("datatable_status"), 
-    tr("datatable_ref"), 
-    tr("datatable_due"), 
+    tr("datatable_status"),
+    tr("datatable_ref"),
+    tr("datatable_due"),
     tr("datatable_desc")
   )
   
@@ -320,11 +320,11 @@ output$gantt_chart <- renderTimevis({
     stringsAsFactors = FALSE,
     id = 1:6,
     description = c(
-      tr("gantt_task_m0"), 
-      tr("gantt_task_m1"), 
-      tr("gantt_task_m2"), 
-      tr("gantt_task_m3"), 
-      tr("gantt_task_m4"), 
+      tr("gantt_task_m0"),
+      tr("gantt_task_m1"),
+      tr("gantt_task_m2"),
+      tr("gantt_task_m3"),
+      tr("gantt_task_m4"),
       tr("gantt_task_m5")
     ),
     ref = c("✓", "0/50", "80%", "70%", "0/2", "0/1"),
@@ -341,7 +341,7 @@ output$gantt_chart <- renderTimevis({
     select(id, content, start, end, className)
     
   timevis(gantt_data_vis, options = list(
-    height = "100%", 
+    height = "100%",
     width = "100%",
     start = "2024-12-01",
     end = "2029-02-01",
@@ -543,6 +543,5 @@ output$map_renda <- renderLeaflet({
     setView(lng = sp_center[1], lat = sp_center[2], zoom = 9)
 })
 
-```
-
 leafletOutput("map_renda")
+```
