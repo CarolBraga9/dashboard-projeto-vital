@@ -535,4 +535,5 @@ output$map_renda <- renderLeaflet({
 })
 
 leafletOutput("map_renda")
+
 ```
