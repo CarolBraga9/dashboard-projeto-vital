@@ -11,24 +11,40 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-# --- ABORDAGEM DE INSTALAÇÃO FINAL E DIRETA ---
+# --- ABORDAGEM DE INSTALAÇÃO INDIVIDUAL E CORRIGIDA ---
 # CORREÇÃO DEFINITIVA: A URL do repositório está agora como uma string de texto simples,
-# que é o formato correto para o R. A lógica complexa foi removida
-# para garantir que a instalação seja executada sem falhas no GitHub Actions.
+# que é o formato correto para o R. Cada pacote será verificado e instalado
+# individualmente para garantir a robustez do processo.
 
-pacotes_necessarios <- c(
-  "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf",
-  "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT",
-  "googlesheets4"
-)
+if (!require("flexdashboard")) { install.packages("flexdashboard", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("shiny")) { install.packages("shiny", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("shinyjs")) { install.packages("shinyjs", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("dplyr")) { install.packages("dplyr", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("leaflet")) { install.packages("leaflet", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("sf")) { install.packages("sf", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("geobr")) { install.packages("geobr", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("htmlwidgets")) { install.packages("htmlwidgets", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("viridis")) { install.packages("viridis", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("timevis")) { install.packages("timevis", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("lubridate")) { install.packages("lubridate", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("DT")) { install.packages("DT", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
+if (!require("googlesheets4")) { install.packages("googlesheets4", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
 
-# Instala todos os pacotes diretamente. Em um ambiente limpo como o do GitHub,
-# esta é a forma mais robusta.
-install.packages(pacotes_necessarios, repos = "[https://cloud.r-project.org](https://cloud.r-project.org)")
 
 # --- CARREGAMENTO DAS BIBLIOTECAS ---
-# Garante que todas as bibliotecas sejam carregadas após a instalação
-lapply(pacotes_necessarios, library, character.only = TRUE)
+library(flexdashboard)
+library(shiny)
+library(shinyjs)
+library(dplyr)
+library(leaflet)
+library(sf)
+library(geobr)
+library(htmlwidgets)
+library(viridis)
+library(timevis)
+library(lubridate)
+library(DT)
+library(googlesheets4)
 
 
 # Define o locale para garantir a formatação correta de datas e textos
@@ -38,7 +54,7 @@ try(Sys.setlocale("LC_ALL", "pt_BR.UTF-8"), silent = TRUE)
 gs4_deauth()
 
 # --- URL DA PLANILHA (CORRIGIDA) ---
-# CORREÇÃO DEFINITIVA: A URL da planilha agora é uma string de texto válida.
+# CORREÇÃO CRÍTICA: A URL da planilha agora é uma string de texto válida.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
