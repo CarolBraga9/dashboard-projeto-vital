@@ -31,6 +31,7 @@ if (!require("DT")) install.packages("DT", repos = "https://cloud.r-project.org"
 if (!require("googlesheets4")) install.packages("googlesheets4", repos = "https://cloud.r-project.org")
 
 
+
 # --- CARREGAMENTO DAS BIBLIOTECAS ---
 library(flexdashboard)
 library(shiny)
