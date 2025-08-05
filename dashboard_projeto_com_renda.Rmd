@@ -11,23 +11,24 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-# --- ABORDAGEM DE INSTALAÇÃO ROBUSTA DE PACOTES ---
-# CORREÇÃO FINAL: As URLs agora são strings de texto simples, permitindo a instalação.
-if (!requireNamespace("remotes", quietly = TRUE)) {
-  install.packages("remotes", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)")
-}
-
+# --- ABORDAGEM DE INSTALAÇÃO DIRETA ---
+# Instalando todos os pacotes necessários diretamente do CRAN.
+# Esta abordagem é mais explícita para resolver o problema no GitHub Actions.
 pacotes_necessarios <- c(
   "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf",
   "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT",
   "googlesheets4"
 )
 
-# Usando remotes para instalar todos os pacotes necessários de uma vez
-remotes::install_cran(pacotes_necessarios, repos = "[https://cloud.r-project.org](https://cloud.r-project.org)")
+# Itera sobre os pacotes e instala apenas os que não estão presentes
+for (pacote in pacotes_necessarios) {
+  if (!require(pacote, character.only = TRUE)) {
+    install.packages(pacote, repos = "[https://cloud.r-project.org](https://cloud.r-project.org)")
+  }
+}
 
 # --- CARREGAMENTO DAS BIBLIOTECAS ---
-# O carregamento é feito após a garantia da instalação
+# Garante que todas as bibliotecas sejam carregadas após a instalação
 lapply(pacotes_necessarios, library, character.only = TRUE)
 
 
@@ -536,4 +537,3 @@ output$map_renda <- renderLeaflet({
 
 leafletOutput("map_renda")
 ```
-
