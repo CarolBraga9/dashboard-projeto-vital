@@ -533,5 +533,6 @@ output$map_renda <- renderLeaflet({
     ) %>%
     setView(lng = sp_center[1], lat = sp_center[2], zoom = 9)
 })
-```
+
 leafletOutput("map_renda")
+```
