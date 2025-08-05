@@ -16,20 +16,19 @@ runtime: shiny
 # que é o formato correto para o R. Cada pacote será verificado e instalado
 # individualmente para garantir a robustez do processo.
 
-if (!require("flexdashboard")) { install.packages("flexdashboard", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("shiny")) { install.packages("shiny", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("shinyjs")) { install.packages("shinyjs", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("dplyr")) { install.packages("dplyr", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("leaflet")) { install.packages("leaflet", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("sf")) { install.packages("sf", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("geobr")) { install.packages("geobr", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("htmlwidgets")) { install.packages("htmlwidgets", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("viridis")) { install.packages("viridis", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("timevis")) { install.packages("timevis", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("lubridate")) { install.packages("lubridate", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("DT")) { install.packages("DT", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-if (!require("googlesheets4")) { install.packages("googlesheets4", repos = "[https://cloud.r-project.org](https://cloud.r-project.org)") }
-
+if (!require("flexdashboard")) install.packages("flexdashboard", repos = "https://cloud.r-project.org")
+if (!require("shiny")) install.packages("shiny", repos = "https://cloud.r-project.org")
+if (!require("shinyjs")) install.packages("shinyjs", repos = "https://cloud.r-project.org")
+if (!require("dplyr")) install.packages("dplyr", repos = "https://cloud.r-project.org")
+if (!require("leaflet")) install.packages("leaflet", repos = "https://cloud.r-project.org")
+if (!require("sf")) install.packages("sf", repos = "https://cloud.r-project.org")
+if (!require("geobr")) install.packages("geobr", repos = "https://cloud.r-project.org")
+if (!require("htmlwidgets")) install.packages("htmlwidgets", repos = "https://cloud.r-project.org")
+if (!require("viridis")) install.packages("viridis", repos = "https://cloud.r-project.org")
+if (!require("timevis")) install.packages("timevis", repos = "https://cloud.r-project.org")
+if (!require("lubridate")) install.packages("lubridate", repos = "https://cloud.r-project.org")
+if (!require("DT")) install.packages("DT", repos = "https://cloud.r-project.org")
+if (!require("googlesheets4")) install.packages("googlesheets4", repos = "https://cloud.r-project.org")
 
 # --- CARREGAMENTO DAS BIBLIOTECAS ---
 library(flexdashboard)
