@@ -11,7 +11,7 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-# --- ABORDAGEM DE INSTALAÇÃO DIRETA ---
+# --- ABORDAGEM DE INSTALAÇÃO DIRETA E CORRIGIDA ---
 # CORREÇÃO FINAL: As URLs agora são strings de texto simples, permitindo a instalação.
 pacotes_necessarios <- c(
   "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf",
@@ -536,4 +536,5 @@ output$map_renda <- renderLeaflet({
 })
 
 leafletOutput("map_renda")
+
 ```
