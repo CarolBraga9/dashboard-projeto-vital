@@ -38,7 +38,8 @@ Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
 # --- AUTENTICAÇÃO NO GOOGLE ---
 gs4_deauth()
 
-# --- URL DA PLANILHA ---
+# --- URL DA PLANILHA (CORREÇÃO) ---
+# A URL foi corrigida para ser uma string de texto simples.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
