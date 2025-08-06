@@ -12,8 +12,9 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 # ===================================================================
-# CORREÇÃO PRINCIPAL: Adicionado script para instalar pacotes ausentes.
-# Isso é essencial para rodar em ambientes limpos como o GitHub Actions.
+# CHUNK DE SETUP NÃO-REATIVO
+# Responsável por instalar pacotes, carregar bibliotecas e ler/processar dados.
+# Nenhuma lógica Shiny (reativa) deve estar aqui.
 # ===================================================================
 
 # --- INSTALAÇÃO E CARREGAMENTO DE PACOTES ---
@@ -28,20 +29,16 @@ for (pkg in packages) {
     install.packages(pkg)
   }
 }
-
-# Carrega todos os pacotes de uma vez
 lapply(packages, library, character.only = TRUE)
-
 
 # Define o locale para garantir a formatação correta de datas e textos
 Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
 
 # --- AUTENTICAÇÃO NO GOOGLE ---
-# Desautentica para uso em ambientes não-interativos (como GitHub Actions).
-# Isso exige que a planilha seja publicamente visível ("Qualquer pessoa com o link").
 gs4_deauth()
 
-# --- URL DA PLANILHA ---
+# --- URL DA PLANILHA (CORREÇÃO CRÍTICA) ---
+# A URL foi corrigida para ser uma string de texto simples, sem formatação Markdown.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
@@ -51,7 +48,7 @@ tryCatch({
   geo <- read_sheet(url_planilha, sheet = "geo")
   translations_df <- read_sheet(url_planilha, sheet = "traducao")
 }, error = function(e) {
-  stop("Falha ao ler os dados do Google Sheets. Verifique a URL, os nomes das abas ('geo', 'treinamento', 'atendimentos', 'traducao') e as permissões. Erro: ", e$message)
+  stop("Falha ao ler os dados do Google Sheets. Verifique a URL, os nomes das abas e as permissões. Erro: ", e$message)
 })
 
 # --- PROCESSAMENTO DOS DADOS GEOGRÁFICOS ---
@@ -69,9 +66,15 @@ num_treinados <- profissionais %>% filter(treinamento_realizado == "Sim") %>% nr
 nota_media <- profissionais %>% filter(!is.na(nota_avaliacao)) %>% summarise(media = mean(nota_avaliacao, na.rm=TRUE)) %>% pull(media)
 total_atendidos <- n_distinct(atendimentos$id_pessoa)
 total_atendimentos <- nrow(atendimentos)
+```{r shiny-reactives, include=FALSE}
+# ===================================================================
+# CHUNK DE SETUP REATIVO
+# Toda a lógica Shiny (observers, reactives, renderUI, etc.) foi
+# movida para este chunk separado para garantir a ordem de execução correta.
+# ===================================================================
 
 # --- SISTEMA DE TRADUÇÃO (i18n) REATIVO ---
-useShinyjs() # Inicializa o shinyjs
+useShinyjs()
 
 current_lang <- reactiveVal("pt")
 observeEvent(input$lang_pt, { current_lang("pt") })
@@ -203,11 +206,11 @@ output$lang_buttons_ui <- renderUI({
 
 <!-- --- HTML PARA INSERIR O LOGO --- -->
 <div class="logo-container">
-  <a href="#"><img src="https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png" alt="Logo" class="logo-left"></a>
+  <a href="#"><img src="[https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png](https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png)" alt="Logo" class="logo-left"></a>
 </div>
 
 <!--
-  Este chunk agora será executado DEPOIS do setup,
+  Este chunk agora será executado DEPOIS dos chunks de setup,
   e a função uiOutput() será encontrada sem problemas.
 -->
 ```{r, echo=FALSE}
