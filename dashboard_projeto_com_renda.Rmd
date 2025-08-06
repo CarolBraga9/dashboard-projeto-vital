@@ -10,109 +10,49 @@ output:
 runtime: shiny
 ---
 
+<!-- CSS e logo -->
 <style>
 /* --- ESTILO PARA LAYOUT MAIS LARGO --- */
-.container-fluid {
-    max-width: 98% !important;
-}
+.container-fluid { max-width: 98% !important; }
 
 /* --- ESTILOS VISUAIS PARA OS VALUE BOXES --- */
-.value-box {
-  border-radius: 8px !important;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.08);
-  transition: all 0.3s ease-in-out;
-  border: 1px solid rgba(0,0,0,0.05);
-}
-
-.value-box:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
-}
-
-/* --- PALETA DE CORES PASTEL PARA OS VALUE BOXES --- */
+.value-box { border-radius: 8px !important; box-shadow: 0 4px 8px rgba(0,0,0,0.08); transition: all 0.3s ease-in-out; border: 1px solid rgba(0,0,0,0.05); }
+.value-box:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
 .bg-primary { background-color: #E3F2FD !important; }
 .bg-success { background-color: #E8F5E9 !important; }
 .bg-info   { background-color: #E0F7FA !important; }
 .bg-warning { background-color: #FFFDE7 !important; }
+.value-box .value, .value-box .caption { color: #333; }
+.value-box .icon { color: rgba(0,0,0,0.35) !important; }
 
-/* --- AJUSTE NA COR DO TEXTO E ÍCONE --- */
-.value-box .value, .value-box .caption {
-  color: #333;
-}
-.value-box .icon {
-  color: rgba(0,0,0,0.35) !important; /* Ícone mais visível */
-}
+/* --- LOGO e NAVBAR --- */
+.logo-container { position: fixed; top: 0; left: 0; width: 100%; height: 50px; z-index: 1050; pointer-events: none; }
+.logo-left { position: absolute; top: 5px; left: 15px; height: 40px; width: auto; pointer-events: auto; }
+.navbar-brand { margin-left: 170px !important; }
 
+/* --- GANTT --- */
+.timevis-item.completed { background-color: #198754; border-color: #157347; color: white; }
+.timevis-item.not-started { background-color: #F57C00; border-color: #e06f00; color: white; }
 
-/* --- ESTILOS PARA O LOGO E TÍTULO --- */
-.logo-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 50px;
-  z-index: 1050;
-  pointer-events: none;
-}
-
-.logo-left {
-  position: absolute;
-  top: 5px;
-  left: 15px;
-  height: 40px;
-  width: auto;
-  pointer-events: auto;
-}
-
-/* Ajusta a margem para não sobrepor o logo */
-.navbar-brand {
-  margin-left: 170px !important;
-}
-
-/* --- ESTILOS PARA O CRONOGRAMA (GANTT) --- */
-.timevis-item.completed {
-    background-color: #198754;
-    border-color: #157347;
-    color: white;
-}
-.timevis-item.not-started {
-    background-color: #F57C00;
-    border-color: #e06f00;
-    color: white;
-}
-
-/* --- ESTILOS PARA BOTÕES DE IDIOMA --- */
-/* O posicionamento é aplicado ao contêiner gerado pelo renderUI */
-.lang-buttons {
-  position: fixed;
-  top: 10px;
-  right: 20px;
-  z-index: 1051;
-}
-.lang-buttons .btn {
-  padding: 4px 8px;
-  font-size: 12px;
-}
+/* --- BOTÕES DE IDIOMA --- */
+.lang-buttons { position: fixed; top: 10px; right: 20px; z-index: 1051; }
+.lang-buttons .btn { padding: 4px 8px; font-size: 12px; }
 </style>
 
-<!-- --- HTML PARA INSERIR O LOGO --- -->
+<!-- logo -->
 <div class="logo-container">
   <a href="#"><img src="https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png" alt="Logo" class="logo-left"></a>
 </div>
 
-```{r, echo=FALSE}
-uiOutput("lang_buttons_ui")
-```
-
 ```{r setup, include=FALSE}
 # ===================================================================
-# SETUP (instala pacotes se necessário) - NÃO executa lógica reativa aqui
+# SETUP: instala/carrega pacotes e lê dados (não cria outputs reativos aqui)
 # ===================================================================
 
 packages <- c(
-  "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf",
-  "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT",
-  "googlesheets4", "plotly"
+  "flexdashboard","shiny","shinyjs","dplyr","leaflet","sf",
+  "geobr","htmlwidgets","viridis","timevis","lubridate","DT",
+  "googlesheets4","plotly"
 )
 for (pkg in packages) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
@@ -120,18 +60,20 @@ for (pkg in packages) {
   }
 }
 lapply(packages, library, character.only = TRUE)
+
+# garante shiny disponível
 library(shiny)
 
-# Define o locale (tentativa; pode falhar em alguns ambientes sem impacto)
+# locale (opcional / tentativa)
 try(Sys.setlocale("LC_ALL", "pt_BR.UTF-8"), silent = TRUE)
 
-# Desautentica leitura pública de Google Sheets
+# desautentica google sheets (caso público)
 try(gs4_deauth(), silent = TRUE)
 
 # URL da planilha (string simples)
 url_planilha <- "https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing"
 
-# Leitura segura: no CI a leitura pode falhar; fallback para data.frame vazio
+# leitura segura: se não conseguir acessar, retorna data.frame vazio
 safe_read_sheet <- function(url, sheet) {
   tryCatch(read_sheet(url, sheet = sheet), error = function(e) { message(sprintf("[safe_read_sheet] %s: %s", sheet, e$message)); data.frame() })
 }
@@ -141,7 +83,7 @@ atendimentos  <- safe_read_sheet(url_planilha, sheet = "atendimentos")
 geo           <- safe_read_sheet(url_planilha, sheet = "geo")
 translations_df <- safe_read_sheet(url_planilha, sheet = "traducao")
 
-# Processamento espacial apenas se geo tiver colunas mínimas
+# processamento espacial — só se geo tiver as colunas mínimas
 crs_sirgas2000 <- 4674
 if (nrow(geo) > 0 && all(c("POSTCODE","LON","LAT") %in% colnames(geo))) {
   geo <- geo %>% filter(!grepl("S", POSTCODE))
@@ -155,13 +97,13 @@ if (nrow(geo) > 0 && all(c("POSTCODE","LON","LAT") %in% colnames(geo))) {
   geo_sf <- data.frame(); sp_city <- NULL; sp_only <- data.frame()
 }
 
-# Indicadores com proteção
+# indicadores (protegidos)
 num_treinados <- if (nrow(profissionais)>0 && "treinamento_realizado" %in% colnames(profissionais)) sum(profissionais$treinamento_realizado=="Sim", na.rm = TRUE) else NA
 nota_media <- if (nrow(profissionais)>0 && "nota_avaliacao" %in% colnames(profissionais)) mean(profissionais$nota_avaliacao, na.rm = TRUE) else NA
 total_atendidos <- if (nrow(atendimentos)>0 && "id_pessoa" %in% colnames(atendimentos)) n_distinct(atendimentos$id_pessoa) else NA
 total_atendimentos <- if (nrow(atendimentos)>0) nrow(atendimentos) else NA
 
-# função de tradução segura
+# função de tradução não-reativa (fallback)
 get_tr <- function(key, lang = "pt"){
   if (exists("translations_df") && nrow(translations_df)>0 && key %in% translations_df$key){
     row <- translations_df[translations_df$key==key,]
@@ -170,7 +112,17 @@ get_tr <- function(key, lang = "pt"){
   return(paste0("[",key,"]"))
 }
 
-# Não definir outputs aqui — isso acontece no bloco server abaixo
+# NÃO definir outputs aqui — isso será feito no bloco server protegido
+```
+
+```{r ui_buttons_placeholder, echo=FALSE}
+# Chamamos uiOutput() apenas SE shiny estiver disponível e em modo interativo
+if (requireNamespace("shiny", quietly = TRUE) && interactive()) {
+  shiny::uiOutput("lang_buttons_ui")
+} else {
+  # placeholder para manter layout em knit estático
+  HTML("")
+}
 ```
 
 ```{r server, include=FALSE}
@@ -180,7 +132,7 @@ get_tr <- function(key, lang = "pt"){
 if (interactive()) {
   useShinyjs()
 
-  # reactive language
+  # reatividade de idioma
   current_lang <- reactiveVal("pt")
   observeEvent(input$lang_pt, { current_lang("pt") })
   observeEvent(input$lang_en, { current_lang("en") })
@@ -197,21 +149,23 @@ if (interactive()) {
     lang <- current_lang()
     translations <- translations_list()
     if (!is.null(translations[[lang]][[key]])) return(translations[[lang]][[key]])
-    return(paste0("[", key, "]"))
+    # fallback para função não-reativa
+    return(get_tr(key, lang))
   }
 
+  # atualiza título do documento
   observe({
     title <- tr("dashboard_title")
     session$sendCustomMessage(type = 'setDocumentTitle', message = list(title = title))
   })
 
-  # lang buttons
+  # botões de idioma
   output$lang_buttons_ui <- renderUI({
     if (current_lang() == "pt") { pt_class <- "btn btn-primary"; en_class <- "btn btn-default" } else { pt_class <- "btn btn-default"; en_class <- "btn btn-primary" }
     div(class = "lang-buttons", actionButton(inputId = "lang_pt", label = "PT", class = pt_class), actionButton(inputId = "lang_en", label = "EN", class = en_class))
   })
 
-  # textos
+  # TEXTOS
   output$welcome_title <- renderText({ tr("welcome_title") })
   output$welcome_intro <- renderText({ tr("welcome_intro") })
   output$nav_gantt <- renderText({ tr("section_gantt") })
@@ -221,7 +175,7 @@ if (interactive()) {
   output$summary_title <- renderText({ tr("project_summary_title") })
   output$gantt_title <- renderText({ tr("section_gantt") })
 
-  # summary table
+  # SUMMARY TABLE
   output$summary_table <- renderDT({
     gantt_data_new <- data.frame(stringsAsFactors = FALSE, id = 1:6,
       description = c(tr("gantt_task_m0"), tr("gantt_task_m1"), tr("gantt_task_m2"), tr("gantt_task_m3"), tr("gantt_task_m4"), tr("gantt_task_m5")),
@@ -235,7 +189,7 @@ if (interactive()) {
     datatable(display_table_data, options = list(dom = 't', paging = FALSE, ordering = FALSE), rownames = FALSE, class = 'display')
   })
 
-  # gantt
+  # GANTT
   output$gantt_chart <- renderTimevis({
     gantt_data_new <- data.frame(stringsAsFactors = FALSE, id = 1:6,
       description = c(tr("gantt_task_m0"), tr("gantt_task_m1"), tr("gantt_task_m2"), tr("gantt_task_m3"), tr("gantt_task_m4"), tr("gantt_task_m5")),
@@ -248,7 +202,7 @@ if (interactive()) {
     timevis(gantt_data_vis, options = list(height = "100%", width = "100%", start = "2024-12-01", end = "2029-02-01", orientation = "top", zoomable = TRUE, stack = TRUE, timeAxis = list(scale = "month", step = 3)))
   })
 
-  # value boxes
+  # VALUE BOXES
   output$outcome1_title <- renderText({ tr("outcome1_title") })
   output$outcome1_vb <- renderValueBox({ valueBox(ifelse(is.na(total_atendidos), "N/D", total_atendidos), tr("vb_reduction_ptb_caption"), icon = "fa-chart-line", color = "primary") })
   output$outcome2_title <- renderText({ tr("outcome2_title") })
@@ -276,7 +230,7 @@ if (interactive()) {
   output$comp3_ind2_title <- renderText({ tr("c3_ind2_title") })
   output$comp3_ind2_vb <- renderValueBox({ valueBox("N/D", tr("vb_protocols_caption"), icon = "fa-file-signature", color = "primary") })
 
-  # monthly visits plotly (example using atendimentos$date or data_atendimento)
+  # monthly visits (plotly)
   output$monthly_visits_chart <- renderPlotly({
     req(atendimentos)
     date_col <- if ("data_atendimento" %in% colnames(atendimentos)) "data_atendimento" else colnames(atendimentos)[1]
@@ -311,7 +265,7 @@ if (interactive()) {
 } # end interactive
 ```
 
-<!-- Handler de JavaScript para atualizar o título da página -->
+<!-- JS handler para título -->
 <script>
 Shiny.addCustomMessageHandler('setDocumentTitle', function(message) {
   document.title = message.title;
@@ -326,11 +280,8 @@ Página Inicial
 
 `r textOutput("welcome_intro", inline = TRUE)`
 - **`r textOutput("nav_gantt", inline = TRUE)`**: Navegue pelo cronograma do projeto.
-
 - **`r textOutput("nav_outcomes", inline = TRUE)`**: Veja os resultados e o impacto.
-
 - **`r textOutput("nav_outputs", inline = TRUE)`**: Explore os produtos e entregas.
-
 - **`r textOutput("nav_tracking", inline = TRUE)`**: Acompanhe os indicadores geográficos.
 
 Row
