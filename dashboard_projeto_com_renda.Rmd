@@ -36,8 +36,8 @@ Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
 # --- AUTENTICAÇÃO NO GOOGLE ---
 gs4_deauth()
 
-# --- URL DA PLANILHA (CORREÇÃO) ---
-# A URL foi corrigida para ser uma string de texto simples.
+# --- URL DA PLANILHA (CORREÇÃO CRÍTICA) ---
+# A URL foi corrigida para ser uma string de texto simples, sem formatação Markdown.
 url_planilha <- "[https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing](https://docs.google.com/spreadsheets/d/1NUxmO-_XYut_3AwsdM9uMo9d9bFTHC47JYONnfbYsw8/edit?usp=sharing)"
 
 # --- LEITURA DOS DADOS ---
@@ -304,7 +304,7 @@ output$map_renda <- renderLeaflet({
 }
 </style>
 
-<!-- --- HTML PARA INSERIR O LOGO (CORREÇÃO) --- -->
+<!-- --- HTML PARA INSERIR O LOGO (CORREÇÃO CRÍTICA) --- -->
 <div class="logo-container">
   <a href="#"><img src="[https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png](https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png)" alt="Logo" class="logo-left"></a>
 </div>
