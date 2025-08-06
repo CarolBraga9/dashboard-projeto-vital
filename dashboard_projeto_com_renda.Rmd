@@ -120,6 +120,7 @@ for (pkg in packages) {
   }
 }
 lapply(packages, library, character.only = TRUE)
+library(shiny)
 
 # Define o locale (tentativa; pode falhar em alguns ambientes sem impacto)
 try(Sys.setlocale("LC_ALL", "pt_BR.UTF-8"), silent = TRUE)
