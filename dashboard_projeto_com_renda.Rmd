@@ -12,25 +12,26 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 # ===================================================================
-# CORREÇÃO PRINCIPAL: Este chunk de setup foi movido para o início.
-# Ele DEVE ser o primeiro bloco de código R a ser executado para que
-# todas as bibliotecas sejam carregadas antes de serem usadas.
+# CORREÇÃO PRINCIPAL: Adicionado script para instalar pacotes ausentes.
+# Isso é essencial para rodar em ambientes limpos como o GitHub Actions.
 # ===================================================================
 
-# --- CARREGAMENTO DAS BIBLIOTECAS ---
-library(flexdashboard)
-library(shiny)
-library(shinyjs)
-library(dplyr)
-library(leaflet)
-library(sf)
-library(geobr)
-library(htmlwidgets)
-library(viridis)
-library(timevis)
-library(lubridate)
-library(DT)
-library(googlesheets4)
+# --- INSTALAÇÃO E CARREGAMENTO DE PACOTES ---
+packages <- c(
+  "flexdashboard", "shiny", "shinyjs", "dplyr", "leaflet", "sf", 
+  "geobr", "htmlwidgets", "viridis", "timevis", "lubridate", "DT", 
+  "googlesheets4"
+)
+
+for (pkg in packages) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+}
+
+# Carrega todos os pacotes de uma vez
+lapply(packages, library, character.only = TRUE)
+
 
 # Define o locale para garantir a formatação correta de datas e textos
 Sys.setlocale("LC_ALL", "pt_BR.UTF-8")
@@ -533,4 +534,3 @@ output$map_renda <- renderLeaflet({
 })
 leafletOutput("map_renda")
 ```
-
