@@ -101,7 +101,7 @@ translations <- list(
 </style>
 
 <div class="logo-container">
-  <a href="#"><img src="[https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png](https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png)" alt="Logo" class="logo-left"></a>
+  <a href="#"><img src="https://wiconnect.iadb.org/wp-content/uploads/2023/07/64ad685333e5720230711143355-1.png" alt="Logo" class="logo-left"></a>
 </div>
 
 ```{r, echo=FALSE}
@@ -127,9 +127,6 @@ Página Inicial {data-icon="fa-home"}
 Cronograma do Projeto {data-icon="fa-calendar"}
 =====================================
 
-Row
--------------------------------------
-
 ### Cronograma de Atividades (Gantt)
 
 ```{r}
@@ -153,11 +150,18 @@ valueBoxOutput("outcome1_vb")
 Tracking Indicators {data-icon="fa-chart-bar .tabset"}
 =====================================
 
-### Atendimentos por Bairro
+### `r textOutput("tracking_map1_title", inline = TRUE)`
 
 ```{r}
 # UI para o mapa de atendimentos
-leafletOutput("map_atendimentos", height = 600)
+leafletOutput("map_atendimentos")
+```
+
+### `r textOutput("tracking_map2_title", inline = TRUE)`
+
+```{r}
+# UI para o mapa de renda
+leafletOutput("map_renda")
 ```{r context="server"}
 # ===================================================================
 # LÓGICA DO SERVIDOR SHINY
@@ -167,11 +171,9 @@ leafletOutput("map_atendimentos", height = 600)
 # --- Lógica de Tradução e UI Dinâmica ---
 
 # Cria um valor reativo para armazenar o idioma atual.
-# Isso DEVE estar dentro do contexto do servidor.
 current_lang <- reactiveVal("pt")
 
 # Função auxiliar para buscar a tradução da chave no idioma atual.
-# Isso também deve estar no contexto do servidor.
 tr <- function(key) {
   translations[[current_lang()]][[key]] %||% paste("Missing:", key)
 }
@@ -184,28 +186,22 @@ output$lang_buttons_ui <- renderUI({
   )
 })
 
-# Observa cliques no botão Português
-observeEvent(input$lang_pt, {
-  current_lang("pt")
-  shinyjs::addClass(selector = "#lang_pt", class = "btn-primary")
-  shinyjs::removeClass(selector = "#lang_pt", class = "btn-default")
-  shinyjs::addClass(selector = "#lang_en", class = "btn-default")
-  shinyjs::removeClass(selector = "#lang_en", class = "btn-primary")
-})
+# Observa cliques nos botões de idioma
+observeEvent(input$lang_pt, { current_lang("pt") })
+observeEvent(input$lang_en, { current_lang("en") })
 
-# Observa cliques no botão Inglês
-observeEvent(input$lang_en, {
-  current_lang("en")
-  shinyjs::addClass(selector = "#lang_en", class = "btn-primary")
-  shinyjs::removeClass(selector = "#lang_en", class = "btn-default")
-  shinyjs::addClass(selector = "#lang_pt", class = "btn-default")
-  shinyjs::removeClass(selector = "#lang_pt", class = "btn-primary")
+# Atualiza o estilo dos botões quando o idioma muda
+observe({
+  is_pt <- current_lang() == "pt"
+  shinyjs::toggleClass(selector = "#lang_pt", class = "btn-primary", condition = is_pt)
+  shinyjs::toggleClass(selector = "#lang_pt", class = "btn-default", condition = !is_pt)
+  shinyjs::toggleClass(selector = "#lang_en", class = "btn-primary", condition = !is_pt)
+  shinyjs::toggleClass(selector = "#lang_en", class = "btn-default", condition = is_pt)
 })
 
 # Atualiza o título do dashboard quando o idioma muda
 observe({
   title <- tr("dashboard_title")
-  # Envia uma mensagem para o JavaScript atualizar o título
   session$sendCustomMessage(type = 'setDocumentTitle', message = list(title = title))
 })
 
@@ -220,7 +216,7 @@ output$welcome_intro <- renderText({ tr("welcome_intro") })
 output$gantt_chart <- renderTimevis({
   gantt_data <- data.frame(
     id = 1:3,
-    content = c(tr("planning"), tr("execution"), tr("closure")), # Usando traduções
+    content = c(tr("planning"), tr("execution"), tr("closure")),
     start = as.Date(c("2025-01-01", "2025-05-26", "2025-12-26")),
     end = as.Date(c("2025-05-25", "2025-12-25", "2026-06-26")),
     className = c("completed", "not-started", "not-started")
@@ -233,28 +229,77 @@ output$outcome1_vb <- renderValueBox({
   valueBox("N/D", tr("reduction_rate"), icon = "fa-chart-line", color = "primary")
 })
 
-# Tracking Indicators
+Tracking Indicators {.tabset}
+=====================================
+
+### `r textOutput("tracking_map1_title", inline = TRUE)`
+
+```{r map-atendimentos}
+output$tracking_map1_title <- renderText({ tr("section_tracking") })
+
 output$map_atendimentos <- renderLeaflet({
   bairro_counts <- atendimentos %>% group_by(bairro) %>% summarise(total = n())
-  
-  # Adiciona coordenadas aleatórias para visualização (idealmente, use geocoding real)
-  bairro_coords <- bairro_counts %>% mutate(
-    lat = -23.55 + runif(n(), -0.15, 0.15),
-    lon = -46.63 + runif(n(), -0.15, 0.15)
-  )
-  
-  pal <- colorBin("viridis", domain = bairro_counts$total, bins = 5)
-  
+  set.seed(456)
+  bairro_coords <- bairro_counts %>% 
+    mutate(
+      lat = -23.55 + runif(n(), -0.15, 0.15), 
+      lon = -46.63 + runif(n(), -0.15, 0.15)
+    )
+
+  pal_bairros <- colorBin(palette = "viridis", domain = bairro_counts$total, bins = 5)
+  sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
+  sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
+
   leaflet(bairro_coords) %>%
     addProviderTiles(providers$CartoDB.Positron) %>%
     addCircles(
-      lng = ~lon, lat = ~lat, weight = 1, radius = ~sqrt(total) * 300, # Raio ajustado
-      color = ~pal(total), fillOpacity = 0.7,
-      popup = ~paste(bairro, "<br>Total:", total) # Adiciona popup
+      lng = ~lon, lat = ~lat, weight = 1, radius = ~sqrt(total) * 1200, 
+      color = ~pal_bairros(total), stroke = FALSE, fillOpacity = 0.7,
+      popup = ~paste0("<b>", tr("map_neighborhood_popup_label"), ":</b> ", bairro, "<br><b>", tr("map_neighborhood_popup_visits"), ":</b> ", total)
     ) %>%
-    addLegend("bottomright", pal = pal, values = ~total,
-      title = tr("total_services"),
-      opacity = 1
-    )
+    addLegend(
+      position = "bottomright", pal = pal_bairros, values = ~total,
+      title = tr("map_neighborhood_legend_title"), opacity = 1
+    ) %>%
+    addMarkers(
+      lng = -46.669943, lat = -23.556373, 
+      popup = tr("map_hospital_label"), label = tr("map_hospital_label")
+    ) %>%
+    setView(lng = sp_center[1], lat = sp_center[2], zoom = 10)
 })
+leafletOutput("map_atendimentos")
 ```
+
+
+### `r textOutput("tracking_map2_title", inline = TRUE)`
+
+```{r map-renda}
+output$tracking_map2_title <- renderText({ tr("map_income_title") })
+
+output$map_renda <- renderLeaflet({
+  sp_only_wgs84 <- st_transform(sp_only, crs = 4326)
+  income_bins <- c(0, 500, 1000, 1500, 2000, 3000, 5000, 50000) 
+  pal <- colorBin("viridis", domain = sp_only_wgs84$renda_per_capita, bins = income_bins, pretty = FALSE)
+  sp_city_wgs84 <- st_transform(sp_city, crs = 4326)
+  sp_center <- st_centroid(st_geometry(sp_city_wgs84)) %>% st_coordinates()
+
+  leaflet(sp_only_wgs84) %>%
+    addProviderTiles(providers$CartoDB.Positron) %>%
+    addCircleMarkers(
+      radius = 3, color = ~pal(renda_per_capita), stroke = FALSE, fillOpacity = 0.6,
+      popup = ~paste("CEP:", POSTCODE, "<br>", tr("map_income_legend_title"), ": R$", renda_per_capita)
+    ) %>%
+    addLegend(
+      position = "bottomright", pal = pal, values = ~renda_per_capita, 
+      title = tr("map_income_legend_title"),
+      labFormat = labelFormat(prefix = "R$ "), opacity = 1
+    ) %>%
+    addMarkers(
+      lng = -46.669943, lat = -23.556373, 
+      popup = tr("map_hospital_label"), label = tr("map_hospital_label")
+    ) %>%
+    setView(lng = sp_center[1], lat = sp_center[2], zoom = 9)
+})
+leafletOutput("map_renda")
+```
+
